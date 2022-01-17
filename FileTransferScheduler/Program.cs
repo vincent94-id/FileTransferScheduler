@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace FileTransferScheduler
@@ -18,8 +19,9 @@ namespace FileTransferScheduler
     {
         public static void Main(string[] args)
         {
-            Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
-            CreateHostBuilder(args).Build().Run();
+                Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
+                CreateHostBuilder(args).Build().Run();
+
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
@@ -40,6 +42,7 @@ namespace FileTransferScheduler
                     .AddJsonFile(path: "appsettings.json", optional: false, reloadOnChange: true)
                     .Build();
 
+                    services.Configure<SchedulerConfig>(configuration.GetSection("SchedulerConfig"));
                     services.AddHostedService<TimeHostedService>()
                     .Configure<EventLogSettings>(config =>
                     {

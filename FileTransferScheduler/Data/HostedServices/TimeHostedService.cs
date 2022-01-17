@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
+using Microsoft.Extensions.Options;
 
 namespace FileTransferScheduler.Data.HostedService
 {
@@ -17,14 +18,16 @@ namespace FileTransferScheduler.Data.HostedService
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger<TimeHostedService> logger;
         private readonly UploadService uploadService;
+        private readonly IOptions<SchedulerConfig> options;
 
-        public TimeHostedService(ILoggerFactory loggerFactory, UploadService uploadService)
+        public TimeHostedService(ILoggerFactory loggerFactory, UploadService uploadService, IOptions<SchedulerConfig> options)
         {
             this.loggerFactory = loggerFactory;
             var path = AppDomain.CurrentDomain.BaseDirectory;
             loggerFactory.AddFile($"{path}\\Logs\\AppLog.txt");
             this.logger = loggerFactory.CreateLogger<TimeHostedService>();
             this.uploadService = uploadService;
+            this.options = options;
             //this.hub = hub;
         }
 
@@ -48,7 +51,7 @@ namespace FileTransferScheduler.Data.HostedService
             var currentMin = DateTime.Now.ToString("mm");
             if (currentMin == "01")
             {
-                var success = await uploadService.uploadFile();
+                var success = await uploadService.genFile("42db6d19-72c8-4de0-a81b-db60b7b72f39");
 
                 if (success)
                     logger.LogInformation("success");
@@ -72,20 +75,49 @@ namespace FileTransferScheduler.Data.HostedService
                 //Process p = new Process(_logger);
                 //await p.resetCycle();
                 //_timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromSeconds(60));
-                logger.LogInformation(DateTime.Now.ToString());
+                logger.LogInformation("CurrentTime: {0}, time to check:{1}",DateTime.Now.ToString(),options.Value.xfileTime);
                 var currentTime = DateTime.Now.ToString("HH:mm");
-                if (currentTime == "15:24")
+                if (checkTimeFrame(currentTime,options.Value.xfileTime))
                 {
-                    var success = await uploadService.uploadFile();
+                    var genFileSuccess = await uploadService.genFile(options.Value.workstationId);
 
-                    if (success)
-                        logger.LogInformation("success");
+                    if (genFileSuccess)
+                    {
+                        logger.LogInformation("Generate Xfile Success");
+                        for (var i = 0; i < 4; i++)
+                        {
+                            var uploadSuccess = uploadService.uploadFile(30);
+                            if (uploadSuccess)
+                            {
+                                logger.LogInformation("Upload file success");
+                                break;
+                            }else
+                            {
+                                logger.LogInformation("Upload file failed, retry upload ({0})",i);
+                            }
+                        }
+                    }
                     else
-                        logger.LogInformation("fail");
+                    {
+                        logger.LogInformation("Generate Xfile Fail");
+                    }
+
                 }
+                
                 await Task.Delay(60000, stoppingToken);
                 
             }
+        }
+
+        private bool checkTimeFrame(string currentTime, string uploadTime)
+        {
+            var times = uploadTime.Split(',');
+            for (var i=0;i< times.Length;i++)
+            {
+                if (currentTime == times[i])
+                    return true;
+            }
+            return false;
         }
     }
 }
