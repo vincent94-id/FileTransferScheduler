@@ -9,53 +9,73 @@ using System.Threading.Tasks;
 
 namespace FileTransferScheduler.Data
 {
-    public class UploadService: IDisposable
+    public class UploadService : IDisposable
     {
         private readonly ILogger log;
         private readonly IOptions<SchedulerConfig> options;
+        private readonly HttpRequest http;
         private string server;
         private string uploadScript;
-        
-        public UploadService(ILoggerFactory loggerFactory, IOptions<SchedulerConfig> options)
+
+        public UploadService(ILoggerFactory loggerFactory, IOptions<SchedulerConfig> options, HttpRequest http)
         {
             this.log = loggerFactory.CreateLogger<UploadService>();
             this.options = options;
             server = options.Value.server;
             uploadScript = options.Value.uploadScript;
+            this.http = http;
         }
 
         public async Task<bool> genFile(string workstationId)
         {
-            
-            var http = new HttpRequest();
+
+            //var http = new HttpRequest();
             var url = $"http://{server}/api/OctopusOps/xfile/" + workstationId;
-            (var status,var result) =await http.getAsync(url);
-            log.LogInformation("Requesting {0}",url);
+            log.LogInformation("Requesting {0}", url);
+            (var status, var result) = await http.getAsync(url, options.Value.maxXFileGenTime);
+
             var json = JsonConvert.DeserializeObject<XFileReponse>(result);
-            log.LogInformation("status:{0} result:{1}",status,result);
+            log.LogInformation("status:{0} result:{1}", status, result);
             if (status == "OK" && json.message == "XFile generated")
                 return true;
             else
                 return false;
         }
 
-        public async Task<bool> sendAlert()
+        public async Task<bool> sendAlert(string workstationId, AlertType alertType)
         {
-            var http = new HttpRequest();
-            var request = new
+            Object request =null;
+            switch(alertType)
             {
+                case AlertType.GenerateFile:
+                    request = new
+                    {
 
-                alertCode = 200002,
-                messageCN = "Upload exchange file failed",
-                messageEN = "Upload exchange file failed",
-                status = 0,
-                id = "0000-0000-0000-0000"
-            };
+                        alertCode = 200002,
+                        messageCN = $"生成八逹通交易檔失敗,電腦編號 {workstationId}",
+                        messageEN = $"Generate octopus file failed in workstation {workstationId}",
+                        status = 0,
+                        id = "0000-0000-0000-0000"
+                    };
+                    break;
+                case AlertType.SendFile:
+                    request = new
+                    {
+
+                        alertCode = 200003,
+                        messageCN = $"上傳失敗,電腦編號 {workstationId}",
+                        messageEN = $"Upload exchange file failed in workstation {workstationId}",
+                        status = 0,
+                        id = "0000-0000-0000-0000"
+                    };
+                    break;
+            }
+            
             var url = $"http://{server}/api/SystemAlert";
             log.LogInformation("Requesting {0}", url);
-            (var status, var result) = await http.postAsync(url,JsonConvert.SerializeObject(request));
-            log.LogInformation("response:{0},{1}", status,result);
-            if (status == "OK" )
+            (var status, var result) = await http.postAsync(url, JsonConvert.SerializeObject(request));
+            log.LogInformation("response:{0},{1}", status, result);
+            if (status == "OK")
                 return true;
             else
                 return false;
@@ -76,9 +96,9 @@ namespace FileTransferScheduler.Data
             cmd.StandardInput.Flush();
             cmd.StandardInput.Close();
             cmd.WaitForExit(timeout);
-            
+
             var result = cmd.StandardOutput.ReadToEnd();
-            result = result.TrimEnd('\r','\n');
+            result = result.TrimEnd('\r', '\n');
             //log.LogInformation(result);
             if (result == "Success Upload")
                 return true;
@@ -90,5 +110,16 @@ namespace FileTransferScheduler.Data
         {
             this.Dispose();
         }
+
+        
     }
+
+    public enum AlertType
+    {
+        GenerateFile,
+        SendFile
+    }
+
+
+
 }

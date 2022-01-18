@@ -52,6 +52,7 @@ namespace FileTransferScheduler
 
                     });
                     services.AddScoped<UploadService>();
+                    services.AddScoped<HttpRequest>();
 
                 })
                 .UseWindowsService();

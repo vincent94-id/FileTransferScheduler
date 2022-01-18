@@ -103,12 +103,13 @@ namespace FileTransferScheduler.Data.HostedService
                         }else
                         {
                             logger.LogInformation("Upload file failed, sending system alert");
-                            await uploadService.sendAlert();
+                            await uploadService.sendAlert(options.Value.workstationId, AlertType.SendFile);
                         }
                     }
                     else
                     {
                         logger.LogInformation("Generate Xfile Fail");
+                        await uploadService.sendAlert(options.Value.workstationId, AlertType.GenerateFile);
                     }
 
                 }
@@ -120,6 +121,7 @@ namespace FileTransferScheduler.Data.HostedService
 
         private bool checkTimeFrame(string currentTime, string uploadTime)
         {
+            logger.LogInformation("compare time {0} with {1}",currentTime,uploadTime);
             var times = uploadTime.Split(',');
             for (var i=0;i< times.Length;i++)
             {

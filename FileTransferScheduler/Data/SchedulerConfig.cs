@@ -13,5 +13,7 @@ namespace FileTransferScheduler.Data
 
         public string uploadScript { get; set; }
         public int retry { get; set; }
+
+        public int maxXFileGenTime { get; set; }
     }
 }

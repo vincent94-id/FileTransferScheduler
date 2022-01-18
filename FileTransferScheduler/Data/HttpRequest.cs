@@ -6,16 +6,19 @@ using System.Net;
 using System.IO;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace FileTransferScheduler.Data
 {
-    class HttpRequest
+    public class HttpRequest:IDisposable
     {
+        private readonly ILogger logger;
         private static readonly HttpClient client = new HttpClient();
 
-        public HttpRequest()
+        public HttpRequest(ILoggerFactory loggerFactory)
         {
-
+            //this.loggerFactory = loggerFactory;
+            this.logger = loggerFactory.CreateLogger<HttpRequest>();
         }
         public string post(string url, string data)
         {
@@ -49,11 +52,26 @@ namespace FileTransferScheduler.Data
             return (response.StatusCode.ToString(),result.ToString());
         }
         
-        public async Task<(string,string)> getAsync(string url)
+        public async Task<(string,string)> getAsync(string url, int timeout)
         {
-            var response = await client.GetAsync(url);
-            var result = await response.Content.ReadAsStringAsync();
+            HttpResponseMessage response = null;
+            string result = null;
+            client.Timeout = TimeSpan.FromSeconds(timeout);
+            try
+            {
+                response = await client.GetAsync(url);
+                result = await response.Content.ReadAsStringAsync();
+            }catch(Exception e)
+            {
+                logger.LogError(e.Message);
+                return (e.Message, JsonConvert.SerializeObject(new XFileReponse() { message = "Generate fail" }));
+            }
             return (response.StatusCode.ToString(), result.ToString());
+        }
+
+        public void Dispose()
+        {
+            this.Dispose();
         }
     }
 }
