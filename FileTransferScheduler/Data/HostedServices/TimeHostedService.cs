@@ -83,18 +83,27 @@ namespace FileTransferScheduler.Data.HostedService
 
                     if (genFileSuccess)
                     {
+                        var uploadSuccess = false;
                         logger.LogInformation("Generate Xfile Success");
-                        for (var i = 0; i < 4; i++)
+                        for (var i = 0; i < options.Value.retry; i++)
                         {
-                            var uploadSuccess = uploadService.uploadFile(30);
+                            uploadSuccess = uploadService.uploadFile(30);
                             if (uploadSuccess)
                             {
-                                logger.LogInformation("Upload file success");
+                                uploadSuccess = true;
                                 break;
                             }else
                             {
-                                logger.LogInformation("Upload file failed, retry upload ({0})",i);
+                                logger.LogInformation("Upload file failed, retry upload ({0})",i+1);
                             }
+                        }
+                        if(uploadSuccess)
+                        {
+                            logger.LogInformation("Upload file successfully");
+                        }else
+                        {
+                            logger.LogInformation("Upload file failed, sending system alert");
+                            await uploadService.sendAlert();
                         }
                     }
                     else

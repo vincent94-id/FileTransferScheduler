@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -11,18 +12,50 @@ namespace FileTransferScheduler.Data
     public class UploadService: IDisposable
     {
         private readonly ILogger log;
-        public UploadService(ILoggerFactory loggerFactory)
+        private readonly IOptions<SchedulerConfig> options;
+        private string server;
+        private string uploadScript;
+        
+        public UploadService(ILoggerFactory loggerFactory, IOptions<SchedulerConfig> options)
         {
             this.log = loggerFactory.CreateLogger<UploadService>();
+            this.options = options;
+            server = options.Value.server;
+            uploadScript = options.Value.uploadScript;
         }
 
         public async Task<bool> genFile(string workstationId)
         {
+            
             var http = new HttpRequest();
-            (var status,var result) =await http.getAsync("http://car-park-api-sit.xanvi.com/api/OctopusOps/xfile/" + workstationId);
+            var url = $"http://{server}/api/OctopusOps/xfile/" + workstationId;
+            (var status,var result) =await http.getAsync(url);
+            log.LogInformation("Requesting {0}",url);
             var json = JsonConvert.DeserializeObject<XFileReponse>(result);
             log.LogInformation("status:{0} result:{1}",status,result);
             if (status == "OK" && json.message == "XFile generated")
+                return true;
+            else
+                return false;
+        }
+
+        public async Task<bool> sendAlert()
+        {
+            var http = new HttpRequest();
+            var request = new
+            {
+
+                alertCode = 200002,
+                messageCN = "Upload exchange file failed",
+                messageEN = "Upload exchange file failed",
+                status = 0,
+                id = "0000-0000-0000-0000"
+            };
+            var url = $"http://{server}/api/SystemAlert";
+            log.LogInformation("Requesting {0}", url);
+            (var status, var result) = await http.postAsync(url,JsonConvert.SerializeObject(request));
+            log.LogInformation("response:{0},{1}", status,result);
+            if (status == "OK" )
                 return true;
             else
                 return false;
@@ -32,7 +65,7 @@ namespace FileTransferScheduler.Data
         {
             var timeout = sec * 1000;
             Process cmd = new Process();
-            cmd.StartInfo.FileName = "c:\\Users\\vincent.chan\\.ssh\\exchange.bat";
+            cmd.StartInfo.FileName = uploadScript;
             cmd.StartInfo.RedirectStandardInput = true;
             cmd.StartInfo.RedirectStandardOutput = true;
             cmd.StartInfo.CreateNoWindow = true;
