@@ -17,10 +17,10 @@ namespace FileTransferScheduler.Data.HostedService
         static Timer _timer;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger<TimeHostedService> logger;
-        private readonly UploadService uploadService;
+        private readonly IUploadService uploadService;
         private readonly IOptions<SchedulerConfig> options;
 
-        public TimeHostedService(ILoggerFactory loggerFactory, UploadService uploadService, IOptions<SchedulerConfig> options)
+        public TimeHostedService(ILoggerFactory loggerFactory, IUploadService uploadService, IOptions<SchedulerConfig> options)
         {
             this.loggerFactory = loggerFactory;
             var path = AppDomain.CurrentDomain.BaseDirectory;

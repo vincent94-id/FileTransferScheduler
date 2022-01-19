@@ -9,15 +9,15 @@ using System.Threading.Tasks;
 
 namespace FileTransferScheduler.Data
 {
-    public class UploadService : IDisposable
+    public class UploadService : IDisposable, IUploadService
     {
         private readonly ILogger log;
         private readonly IOptions<SchedulerConfig> options;
-        private readonly HttpRequest http;
+        private readonly IHttpRequest http;
         private string server;
         private string uploadScript;
 
-        public UploadService(ILoggerFactory loggerFactory, IOptions<SchedulerConfig> options, HttpRequest http)
+        public UploadService(ILoggerFactory loggerFactory, IOptions<SchedulerConfig> options, IHttpRequest http)
         {
             this.log = loggerFactory.CreateLogger<UploadService>();
             this.options = options;
@@ -44,8 +44,8 @@ namespace FileTransferScheduler.Data
 
         public async Task<bool> sendAlert(string workstationId, AlertType alertType)
         {
-            Object request =null;
-            switch(alertType)
+            Object request = null;
+            switch (alertType)
             {
                 case AlertType.GenerateFile:
                     request = new
@@ -70,7 +70,7 @@ namespace FileTransferScheduler.Data
                     };
                     break;
             }
-            
+
             var url = $"http://{server}/api/SystemAlert";
             log.LogInformation("Requesting {0}", url);
             (var status, var result) = await http.postAsync(url, JsonConvert.SerializeObject(request));
@@ -111,7 +111,7 @@ namespace FileTransferScheduler.Data
             this.Dispose();
         }
 
-        
+
     }
 
     public enum AlertType

@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FileTransferScheduler.Data
 {
-    public class HttpRequest:IDisposable
+    public class HttpRequest : IHttpRequest
     {
         private readonly ILogger logger;
         private static readonly HttpClient client = new HttpClient();
@@ -30,7 +30,7 @@ namespace FileTransferScheduler.Data
 
             using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
             {
-               
+
 
                 streamWriter.Write(data);
             }
@@ -44,15 +44,15 @@ namespace FileTransferScheduler.Data
             return result;
         }
 
-        public async Task<(string,string)> postAsync(string url, string data)
+        public async Task<(string, string)> postAsync(string url, string data)
         {
 
-            var response = await client.PostAsync(url, new StringContent(data, Encoding.UTF8, "application/json")) ;
+            var response = await client.PostAsync(url, new StringContent(data, Encoding.UTF8, "application/json"));
             var result = await response.Content.ReadAsStringAsync();
-            return (response.StatusCode.ToString(),result.ToString());
+            return (response.StatusCode.ToString(), result.ToString());
         }
-        
-        public async Task<(string,string)> getAsync(string url, int timeout)
+
+        public async Task<(string, string)> getAsync(string url, int timeout)
         {
             HttpResponseMessage response = null;
             string result = null;
@@ -61,7 +61,8 @@ namespace FileTransferScheduler.Data
             {
                 response = await client.GetAsync(url);
                 result = await response.Content.ReadAsStringAsync();
-            }catch(Exception e)
+            }
+            catch (Exception e)
             {
                 logger.LogError(e.Message);
                 return (e.Message, JsonConvert.SerializeObject(new XFileReponse() { message = "Generate fail" }));
