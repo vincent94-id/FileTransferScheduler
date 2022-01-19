@@ -52,6 +52,7 @@ namespace FileTransferScheduler
 
                     });
                     services.AddScoped<IUploadService,UploadService>();
+                    services.AddScoped<IDownloadService, DownloadService>();
                     services.AddScoped<IHttpRequest,HttpRequest>();
 
                 })

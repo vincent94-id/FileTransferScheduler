@@ -18,15 +18,17 @@ namespace FileTransferScheduler.Data.HostedService
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger<TimeHostedService> logger;
         private readonly IUploadService uploadService;
+        private readonly IDownloadService downloadService;
         private readonly IOptions<SchedulerConfig> options;
 
-        public TimeHostedService(ILoggerFactory loggerFactory, IUploadService uploadService, IOptions<SchedulerConfig> options)
+        public TimeHostedService(ILoggerFactory loggerFactory, IUploadService uploadService, IDownloadService downloadService, IOptions<SchedulerConfig> options)
         {
             this.loggerFactory = loggerFactory;
             var path = AppDomain.CurrentDomain.BaseDirectory;
             loggerFactory.AddFile($"{path}\\Logs\\AppLog.txt");
             this.logger = loggerFactory.CreateLogger<TimeHostedService>();
             this.uploadService = uploadService;
+            this.downloadService = downloadService;
             this.options = options;
             //this.hub = hub;
         }
@@ -77,6 +79,8 @@ namespace FileTransferScheduler.Data.HostedService
                 //_timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromSeconds(60));
                 logger.LogInformation("CurrentTime: {0}, time to check:{1}",DateTime.Now.ToString(),options.Value.xfileTime);
                 var currentTime = DateTime.Now.ToString("HH:mm");
+                
+                // gen xfile and upload
                 if (checkTimeFrame(currentTime,options.Value.xfileTime))
                 {
                     var genFileSuccess = await uploadService.genFile(options.Value.workstationId);
@@ -87,7 +91,7 @@ namespace FileTransferScheduler.Data.HostedService
                         logger.LogInformation("Generate Xfile Success");
                         for (var i = 0; i < options.Value.retry; i++)
                         {
-                            uploadSuccess = uploadService.uploadFile(30);
+                            uploadSuccess = uploadService.uploadFile(options.Value.maxExchangeTime);
                             if (uploadSuccess)
                             {
                                 uploadSuccess = true;
@@ -113,7 +117,38 @@ namespace FileTransferScheduler.Data.HostedService
                     }
 
                 }
-                
+                // download meta data and init
+                if (checkTimeFrame(currentTime, options.Value.initTime))
+                {
+                    var downloadSuccess = false;
+                    for (var i = 0; i < options.Value.retry; i++)
+                    {
+                        downloadSuccess = downloadService.downloadFile(options.Value.maxExchangeTime);
+                        if (downloadSuccess)
+                        {
+                            downloadSuccess = true;
+                            break;
+                        }
+                        else
+                        {
+                            logger.LogInformation("Download meta file failed, retry download ({0})", i + 1);
+                        }
+                    }
+                    if (downloadSuccess)
+                    {
+                        logger.LogInformation("Download meta file successfully");
+                        var sendInitSuccess = await downloadService.sendInit(options.Value.workstationId);
+                        if(sendInitSuccess)
+                        {
+                            logger.LogInformation("Octopus update meta data successfully.");
+                        }
+                    }
+                    else
+                    {
+                        logger.LogInformation("Download file failed, sending system alert");
+                        await downloadService.sendAlert(options.Value.workstationId, AlertType.SendFile);
+                    }
+                }
                 await Task.Delay(60000, stoppingToken);
                 
             }

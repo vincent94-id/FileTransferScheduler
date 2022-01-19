@@ -65,7 +65,7 @@ namespace FileTransferScheduler.Data
             catch (Exception e)
             {
                 logger.LogError(e.Message);
-                return (e.Message, JsonConvert.SerializeObject(new XFileReponse() { message = "Generate fail" }));
+                return (e.Message, JsonConvert.SerializeObject(new OctopusReponse() { message = "Generate fail" }));
             }
             return (response.StatusCode.ToString(), result.ToString());
         }

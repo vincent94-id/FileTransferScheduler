@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace FileTransferScheduler.Data
 {
-    public class XFileReponse
+    public class OctopusReponse
     {
         public object octopusData { get; set; }
         public string message { get; set; }
