@@ -16,17 +16,19 @@ namespace FileTransferScheduler.Data.HostedService
     {
         static Timer _timer;
         private readonly ILoggerFactory loggerFactory;
-        private readonly ILogger<TimeHostedService> logger;
+        //private readonly ILogger<TimeHostedService> logger;
+        private readonly Serilogger logger;
         private readonly IUploadService uploadService;
         private readonly IDownloadService downloadService;
         private readonly IOptions<SchedulerConfig> options;
 
-        public TimeHostedService(ILoggerFactory loggerFactory, IUploadService uploadService, IDownloadService downloadService, IOptions<SchedulerConfig> options)
+        public TimeHostedService(ILoggerFactory loggerFactory, IUploadService uploadService, IDownloadService downloadService, IOptions<SchedulerConfig> options, Serilogger logger)
         {
-            this.loggerFactory = loggerFactory;
+            //this.loggerFactory = loggerFactory;
             var path = AppDomain.CurrentDomain.BaseDirectory;
-            loggerFactory.AddFile($"{path}\\Logs\\AppLog.txt");
-            this.logger = loggerFactory.CreateLogger<TimeHostedService>();
+            //loggerFactory.AddFile($"{path}\\Logs\\AppLog.txt");
+            //this.logger = loggerFactory.CreateLogger<TimeHostedService>();
+            this.logger = logger;
             this.uploadService = uploadService;
             this.downloadService = downloadService;
             this.options = options;
@@ -72,38 +74,48 @@ namespace FileTransferScheduler.Data.HostedService
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            logger.LogInformation("Program started");
             while (!stoppingToken.IsCancellationRequested)
             {
                 //Process p = new Process(_logger);
                 //await p.resetCycle();
                 //_timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromSeconds(60));
-                logger.LogInformation("CurrentTime: {0}, time to check:{1}",DateTime.Now.ToString(),options.Value.xfileTime);
+                //logger.LogInformation("CurrentTime: {0}, time to check:{1}",DateTime.Now.ToString(),options.Value.xfileTime);
                 var currentTime = DateTime.Now.ToString("HH:mm");
                 
                 // gen xfile and upload
                 if (checkTimeFrame(currentTime,options.Value.xfileTime))
                 {
-                    var genFileSuccess = await uploadService.genFile(options.Value.workstationId);
+                    logger.LogInformation("Download time triggered(download schedule:{0})", options.Value.xfileTime);
+                    var genFileSuccess = false;
+                    try
+                    {
+                        genFileSuccess = await uploadService.genFile(options.Value.workstationId);
 
+                    }catch(Exception e)
+                    {
+                        logger.LogError(e.Message);
+                    }
                     if (genFileSuccess)
                     {
                         var uploadSuccess = false;
                         logger.LogInformation("Generate Xfile Success");
                         for (var i = 0; i < options.Value.retry; i++)
                         {
-                            uploadSuccess = uploadService.uploadFile(options.Value.maxExchangeTime);
+                            //uploadSuccess = uploadService.uploadFile(options.Value.maxExchangeTime);
+                            uploadSuccess = uploadService.sftpUpload();
                             if (uploadSuccess)
                             {
                                 uploadSuccess = true;
                                 break;
                             }else
                             {
-                                logger.LogInformation("Upload file failed, retry upload ({0})",i+1);
+                                logger.LogInformation("Upload file failed, retry upload ({0})",(i+1).ToString());
                             }
                         }
                         if(uploadSuccess)
                         {
-                            logger.LogInformation("Upload file successfully");
+                            logger.LogInformation("Upload XFile Completed.");
                         }else
                         {
                             logger.LogInformation("Upload file failed, sending system alert");
@@ -119,11 +131,14 @@ namespace FileTransferScheduler.Data.HostedService
                 }
                 // download meta data and init
                 if (checkTimeFrame(currentTime, options.Value.initTime))
+                //if(true)
                 {
+                    logger.LogInformation("Upload time triggered(upload schedule:{0})", options.Value.initTime);
                     var downloadSuccess = false;
                     for (var i = 0; i < options.Value.retry; i++)
                     {
-                        downloadSuccess = downloadService.downloadFile(options.Value.maxExchangeTime);
+
+                        downloadSuccess = downloadService.sftpDownload();
                         if (downloadSuccess)
                         {
                             downloadSuccess = true;
@@ -131,32 +146,44 @@ namespace FileTransferScheduler.Data.HostedService
                         }
                         else
                         {
-                            logger.LogInformation("Download meta file failed, retry download ({0})", i + 1);
+                            logger.LogInformation("Download meta files failed, retry download ({0})", (i + 1).ToString());
                         }
                     }
                     if (downloadSuccess)
                     {
-                        logger.LogInformation("Download meta file successfully");
-                        var sendInitSuccess = await downloadService.sendInit(options.Value.workstationId);
+                        logger.LogInformation("Download meta files successfully");
+                        var sendInitSuccess = false;
+                        try
+                        {
+                            sendInitSuccess = await downloadService.sendInit(options.Value.workstationId);
+                        }catch(Exception e)
+                        {
+                            logger.LogError(e.Message);
+                        }
                         if(sendInitSuccess)
                         {
-                            logger.LogInformation("Octopus update meta data successfully.");
+                            logger.LogInformation("Octopus device update meta files successfully.");
+                        }else
+                        {
+                            logger.LogInformation("Octopus device update meta files failed.");
                         }
                     }
                     else
                     {
-                        logger.LogInformation("Download file failed, sending system alert");
+                        logger.LogInformation("Download meta files failed, sending system alert");
                         await downloadService.sendAlert(options.Value.workstationId, AlertType.SendFile);
                     }
                 }
                 await Task.Delay(60000, stoppingToken);
                 
             }
+            logger.LogInformation("Program shutdown");
         }
 
         private bool checkTimeFrame(string currentTime, string uploadTime)
         {
-            logger.LogInformation("compare time {0} with {1}",currentTime,uploadTime);
+            
+            //logger.LogInformation("compare time {0} with {1}",currentTime,uploadTime);
             var times = uploadTime.Split(',');
             for (var i=0;i< times.Length;i++)
             {

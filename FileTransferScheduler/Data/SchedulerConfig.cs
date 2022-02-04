@@ -20,6 +20,17 @@ namespace FileTransferScheduler.Data
 
         public int maxInitTime { get; set; }
         public int maxExchangeTime { get; set; }
+
+        public string sftpHost { get; set; }
+        public string sftpUsername { get; set; }
+        public string sftpHostFingerprint { get; set; }
+        public string sftpPrivateKey { get; set; }
+
+        public string sftpLocalUploadPath { get; set; }
+        public string sftpRemoteUploadPath { get; set; }
+
+        public string sftpLocalDownloadPath { get; set; }
+        public string sftpRemoteDownloadPath { get; set; }
     }
 
     public enum AlertType

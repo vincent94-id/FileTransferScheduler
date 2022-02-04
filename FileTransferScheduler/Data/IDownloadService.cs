@@ -6,6 +6,7 @@ namespace FileTransferScheduler.Data
     {
         void Dispose();
         bool downloadFile(int sec);
+        bool sftpDownload();
         Task<bool> sendAlert(string workstationId, AlertType alertType);
         Task<bool> sendInit(string workstationId);
     }

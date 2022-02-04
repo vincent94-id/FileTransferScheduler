@@ -26,20 +26,28 @@ namespace FileTransferScheduler
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
+            
             .ConfigureLogging(
-                options => options.AddFilter<EventLogLoggerProvider>(level => level >= LogLevel.Information)
+                options =>
+                {
+                    options.AddFilter<EventLogLoggerProvider>(level => level >= LogLevel.Information);
+                    
+                }
+
 
                 )
-                //.ConfigureWebHostDefaults(webBuilder =>
+               // .ConfigureWebHostDefaults(webBuilder =>
                 //{
                 //    webBuilder.UseStartup<Startup>();
                 //})
-                .ConfigureServices((hostContext,services)=>
+                //.UseSerilog()
+                .ConfigureServices((hostContext, services) =>
                 {
                     var configuration = new ConfigurationBuilder()
                     .SetBasePath(Directory.GetCurrentDirectory())
                     // load in the json file as configuration
                     .AddJsonFile(path: "appsettings.json", optional: false, reloadOnChange: true)
+
                     .Build();
 
                     services.Configure<SchedulerConfig>(configuration.GetSection("SchedulerConfig"));
@@ -51,11 +59,13 @@ namespace FileTransferScheduler
 
 
                     });
-                    services.AddScoped<IUploadService,UploadService>();
+                    services.AddScoped<IUploadService, UploadService>();
                     services.AddScoped<IDownloadService, DownloadService>();
-                    services.AddScoped<IHttpRequest,HttpRequest>();
+                    services.AddScoped<IHttpRequest, HttpRequest>();
+                    services.AddScoped<Serilogger>();
 
                 })
+                
                 .UseWindowsService();
     }
 }

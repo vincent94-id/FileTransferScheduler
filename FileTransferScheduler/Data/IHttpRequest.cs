@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace FileTransferScheduler.Data
 {
-    public interface IHttpRequest
+    public interface IHttpRequest :IDisposable
     {
         void Dispose();
         Task<(string, string)> getAsync(string url, int timeout);

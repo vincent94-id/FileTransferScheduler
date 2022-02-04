@@ -12,13 +12,14 @@ namespace FileTransferScheduler.Data
 {
     public class HttpRequest : IHttpRequest
     {
-        private readonly ILogger logger;
-        private static readonly HttpClient client = new HttpClient();
+        private readonly Serilogger logger;
+        private readonly HttpClient client = new HttpClient();
 
-        public HttpRequest(ILoggerFactory loggerFactory)
+        public HttpRequest(Serilogger logger)
         {
             //this.loggerFactory = loggerFactory;
-            this.logger = loggerFactory.CreateLogger<HttpRequest>();
+            //this.logger = loggerFactory.CreateLogger<HttpRequest>();
+            this.logger = logger;
         }
         public string post(string url, string data)
         {

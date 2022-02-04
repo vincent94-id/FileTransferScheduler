@@ -4,26 +4,41 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using WinSCP;
 
 namespace FileTransferScheduler.Data
 {
     public class DownloadService : IDisposable, IDownloadService
     {
-        private readonly ILogger log;
+        private readonly Serilogger log;
+        //private readonly ILogger log;
         private readonly IOptions<SchedulerConfig> options;
         private readonly IHttpRequest http;
         private string server;
         private string uploadScript;
+        private SessionOptions sessionOptions;
 
-        public DownloadService(ILoggerFactory loggerFactory, IOptions<SchedulerConfig> options, IHttpRequest http)
+        public DownloadService(ILoggerFactory loggerFactory, IOptions<SchedulerConfig> options, IHttpRequest http, Serilogger logger)
         {
-            this.log = loggerFactory.CreateLogger<UploadService>();
+            //this.log = loggerFactory.CreateLogger<UploadService>();
+            this.log = logger;
             this.options = options;
             server = options.Value.server;
             uploadScript = options.Value.uploadScript;
             this.http = http;
+
+            sessionOptions = new SessionOptions
+            {
+                Protocol = Protocol.Sftp,
+                HostName = options.Value.sftpHost,
+                UserName = options.Value.sftpUsername,
+                SshHostKeyFingerprint = options.Value.sftpHostFingerprint,
+                SshPrivateKeyPath = options.Value.sftpPrivateKey,
+                
+            };
         }
 
         public async Task<bool> sendInit(string workstationId)
@@ -31,11 +46,11 @@ namespace FileTransferScheduler.Data
 
             //var http = new HttpRequest();
             var url = $"http://{server}/api/OctopusOps/connect/" + workstationId;
-            log.LogInformation("Requesting {0}", url);
+            //log.LogInformation("Requesting {0}", url);
             (var status, var result) = await http.getAsync(url, options.Value.maxInitTime);
-
+            //log.LogInformation("status:{0} result:{1}", status, result);
             var json = JsonConvert.DeserializeObject<OctopusReponse>(result);
-            log.LogInformation("status:{0} result:{1}", status, result);
+            
             if (status == "OK" && json.message == "Connect Success")
                 return true;
             else
@@ -106,6 +121,59 @@ namespace FileTransferScheduler.Data
                 return false;
         }
 
+        public bool sftpDownload()
+        {
+            bool success = true;
+            log.LogInformation("SFTP transfer start");
+            using (Session session = new Session())
+            {
+                // Throw on any error
+                try
+                {
+                    session.Open(sessionOptions);
+
+                    TransferOptions transferOptions = new TransferOptions();
+                    transferOptions.TransferMode = TransferMode.Binary;
+                    
+
+                    TransferOperationResult transferResult;
+                    transferResult = session.GetFiles(options.Value.sftpRemoteDownloadPath +"*" , options.Value.sftpLocalDownloadPath, false, transferOptions);
+                    //transferResult = session.GetFilesToDirectory(options.Value.sftpLocalDownloadPath, options.Value.sftpRemoteDownloadPath);
+                    //var info = session.ListDirectory(options.Value.sftpRemoteDownloadPath);
+                    //transferResult =
+                    //session.PutFiles(options.Value.sftpLocalUploadPath + "*", options.Value.sftpRemoteUploadPath, false, transferOptions);
+
+                    
+                    transferResult.Check();
+                    // Print results
+                    foreach (TransferEventArgs transfer in transferResult.Transfers)
+                    {
+                        log.LogInformation("Download of {0} succeeded", transfer.FileName);
+
+                        // move to backup folder
+                        var filename = new DirectoryInfo(transfer.FileName).Name;
+                        var folder = new DirectoryInfo(transfer.FileName).Parent.Parent;
+                        var backupFolder = folder.ToString().Replace("\\","/") + "/old_download/" + DateTime.Now.ToString("yyyy-MM-dd") + "/";
+                        //if(!Directory.Exists(backupFolder))
+                            //Directory.CreateDirectory(backupFolder);
+                        var backupfile = backupFolder + filename;
+                        if(!session.FileExists(backupFolder))
+                            session.CreateDirectory(backupFolder);
+                        session.MoveFile(transfer.FileName, backupfile);
+                    }
+                    
+
+                }
+                catch (Exception e)
+                {
+                    success = false;
+                    log.LogError(e.Message);
+                }
+
+
+            }
+            return success;
+        }
         public void Dispose()
         {
             this.Dispose();

@@ -8,5 +8,7 @@ namespace FileTransferScheduler.Data
         Task<bool> genFile(string workstationId);
         Task<bool> sendAlert(string workstationId, AlertType alertType);
         bool uploadFile(int sec);
+
+        bool sftpUpload();
     }
 }
